@@ -1,2 +1,2 @@
-# Distributuions
+# Distributions
 A shiny app to display common theoretical probability distributions
