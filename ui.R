@@ -1,10 +1,12 @@
 dashboardPage(
-  dashboardHeader(title = "Distributuions"),
+  dashboardHeader(title = "Distributions"),
   dashboardSidebar(
     sidebarMenu(
       menuItem("Binomial", tabName = "binom"),
       menuItem("Normal", tabName = "norm"),
-      menuItem("t", tabName = "t_dist")
+      menuItem("t", tabName = "t_dist"),
+      br(),
+      menuItem("Central Limit Theorem", tabName = "CLT")
     )
   ),
   dashboardBody(
@@ -84,7 +86,49 @@ dashboardPage(
                   verbatimTextOutput('t_dist_summary')
                 )
               )
-      ) # End Norm
+      ), # End t_dist
+      tabItem("CLT",
+              fluidRow(
+                box(
+                  width = 8, status = "info", solidHeader = TRUE,
+                  title = "Population Distribution",
+                  plotOutput("PoplnPlot", height="300px")
+                ),
+                box(
+                  width = 4, status = "info", solidHeader = TRUE,
+                  title = "Adjust Population",
+                  radioButtons("dist", "Parent distribution:", list(
+                    "Uniform" = "runif",
+                    "Log-normal" = "rlnorm",
+                    "Normal" = "rnorm",
+                    "Exponential" = "rexp",
+                    "Irregular" = "sample")),
+                  sliderInput("k", "Sample size:", 
+                              value = 5,
+                              min = 2, 
+                              max = 100)
+                  )
+                
+              ),
+              fluidRow(
+                box(
+                  width = 8, status = "info", solidHeader = TRUE,
+                  title = "Sample Distribution",
+                  plotOutput("plot_samples", height="300px")
+                ),
+                box(
+                  width = 4, status = "info", solidHeader = TRUE,
+                  title = "Adjust sample plot",
+                  checkboxInput("setparent", "Zoom into data range?", TRUE),
+                  selectInput("showdensity", label = "Plot type",
+                               choices = list("Density" = 1,
+                                              "Histogram" = 2), 
+                               selected = 1),
+                  uiOutput("prodshownorm"),
+                  uiOutput("prodbinselect")
+                )
+              )
+      ) # End CLT
     )
   )
 )

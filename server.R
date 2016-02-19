@@ -262,6 +262,247 @@ function(input,output) {
           , sep = "") # close main paste
   }) # End of summary
   
+  ##########################
+  ##########################
+  ##### CLT ################
   
+  # Make a list called data, where the type of distribution (fun) and 
+  # associated values (vals) are stored  
+  data <- reactive({  
+    
+    if ( input$dist == "sample") {
+      
+      #      vals <-  do.call(dist, list(x = 1:50, size = 100, replace = TRUE))
+      set.seed(68686)
+      vals <-  c(sample(1:50, 5000, TRUE), rnorm(5000, 38, 6), rexp(1000), runif(5000, 4, 30))
+      
+    } else {
+      vals <-  do.call(input$dist, list(n=20000))
+      
+    }      
+    return (list(fun=input$dist, vals=vals))
+  })
+  
+  #############################################################
+  output$PoplnPlot <- renderPlot({
+    # Same a human readable distribution name as a string
+    distname <- switch(input$dist,
+                       sample = "Irregular distribution",
+                       rexp = "Exponential distribution",
+                       rnorm = "Normal distribution",
+                       rlnorm = "Log-normal distribution",
+                       runif = "Uniform distribution")
+    
+    # Save the input variables as new variables
+    nparent <- 20000
+    #     n <- input$n # Size of sample.
+    n <- 30 # Size of sample.
+    k <- input$k # number of reiterations.
+    
+    # pdist: The generated data set 
+    pdist <- data()$vals
+    
+    # x: A list with multiple random samples from the parent data set:
+    x <- replicate(k, do.call(sample, list(x = pdist, size = n, replace = TRUE)))
+    
+    # ndist: A vector containing the means of all the k samples of size n from the original population.  
+    ndist <- rowMeans(x) 
+    
+    # Make irregular dist:
+    set.seed(68686)
+    r_irreg <- c(sample(1:50, 5000, TRUE), rnorm(5000, 38, 4), exp(x = 5000), runif(5000, 5, 25))
+    
+    # expect: Set expected mean for each distribution
+    expect <- switch(input$dist,
+                     irreg = c(mean(r_irreg), sd(r_irreg)),
+                     rexp = c(1^-1, 1^-2),
+                     rnorm = c(0, 1),
+                     rlnorm = c(exp(0+(1/2)*1^2), exp(0 + 1^2)*(exp(1^2)-1)),
+                     runif = c(0.5, (1/12)*1))
+    
+    # obs: A data frame containing the observed means and variance of the pdist
+    obs <- data.frame(
+      pdist=c(mean(pdist),var(pdist)), # Mean and variance of the parent distribution
+      ndist=c(mean(ndist), var(ndist)) # Mean and variance of means of the k samples
+    ) 
+    
+    # Plot 1: The original distribution.
+    df.raw <- data()$vals
+    df.raw <- as.data.frame(df.raw)
+    #print(names(df.raw))
+    names(df.raw)[1] <-  c("value")
+    
+    q <- ggplot(df.raw, aes ( x = value, )) +
+      #  geom_histogram(aes(y = ..density..), col = "black", fill = "#F5B319") +
+      geom_histogram(fill = "#F5B319") +
+      scale_y_continuous(name = "Absolute frequency", expand = c(0,0)) +
+      theme(panel.background = element_blank(),
+            panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.ticks.x = element_line(colour = "black"),
+            axis.ticks.y = element_line(colour = "black"),
+            axis.line = element_line(colour = "black"),
+            #        axis.line.y = element_line(colour = "blue", size = 2),
+            axis.text.x = element_text(colour = "black"),
+            axis.text.y = element_text(colour = "black")
+      )
+    
+    
+    if (input$dist == "rnorm") {
+      print(q + scale_x_continuous("Value in Population", expand = c(0,0), limits = c(-4,4)))  
+    } else if (input$dist == "rexp") {
+      print(q + scale_x_continuous("Value in Population", expand = c(0,0), limits = c(0,10)))    
+    } else if (input$dist == "rlnorm") {
+      print(q + scale_x_continuous("Value in Population", expand = c(0,0), limits = c(0,20)))    
+    } else if (input$dist == "runif") {
+      print(q + scale_x_continuous("Value in Population", expand = c(0,0), limits = c(0,1)))    
+    } else {  
+      print(q + scale_x_continuous("Value in Population", expand = c(0,0)))
+    }      
+    
+    
+  }) # end renderPlot for PoplnPlot
+  #############################################################
+  
+  
+  
+  ### Make UI elements:
+  output$prodshownorm <- renderUI({
+    if (is.null(input$showdensity)) {
+      return(NULL) 
+    } else if (input$showdensity == 1) {
+      checkboxInput("shownorm", "Show normal distributuion?", FALSE)
+    } else if (input$showdensity == 2) {
+      checkboxInput("setwidth", "Adjust Binwidth? (not for irregular dist.)", FALSE)
+    }  
+  })
+  
+  output$prodbinselect <- renderUI({
+    # req(input$showdensity)
+    # shiny::validate(need(input$showdensity, message=FALSE))
+    if (is.null(input$setwidth)) {
+      return(NULL) 
+    } else if (input$setwidth) {
+    sliderInput("bin", "Bin width:", 
+              value = 0.13,
+              min = 0.025, 
+              max = 0.25)
+    }
+  })
+  
+  #############################################################
+  output$plot_samples <- renderPlot({
+    if (is.null(input$setwidth)) {
+      return(NULL) 
+    }
+
+    # New
+    n <- input$k # Size of sample.
+    k <- 30 # number of reiterations - fixed
+    
+    # pdist: The generated data set 
+    pdist <- data()$vals
+    
+    # x: A list with multiple random samples from the parent data set:
+    x <- replicate(k, do.call(sample, list(x = pdist, size = n, replace = TRUE)))
+    
+    # ndist: A vector containing the means of all the k samples of size n from the original population.  
+    ndist <- colMeans(x) 
+    
+    df.raw <- as.data.frame(ndist)
+    names(df.raw)[1] <-  c("value")
+    
+    # if (is.null(df.raw)) {
+    #   return(NULL) 
+    # }
+    # 
+    p <- ggplot(df.raw, aes (x = value))
+    
+    if (input$setwidth) {
+      bin_norm <- input$bin
+      bin_exp <- input$bin
+      bin_lnorm <- input$bin
+      bin_unif <- input$bin
+    } else {
+      bin_norm <- 8/60
+      bin_exp <- 10/60
+      bin_lnorm <- 20/120
+      bin_unif <- 1/40
+    }
+    # 
+    # 
+    # 
+    # # Use parental x-scale?
+    if (!input$setparent) {
+      if (input$dist == "rnorm") {
+        p <- p +
+          scale_x_continuous("Sample mean", expand = c(0,0), limits = c(-4,4))
+      } else if (input$dist == "rexp") {
+        p <- p +
+          scale_x_continuous("Sample mean", expand = c(0,0), limits = c(0,10))
+      } else if (input$dist == "rlnorm") {
+        p <- p +
+          scale_x_continuous("Sample mean", expand = c(0,0), limits = c(0,20))
+      } else if (input$dist == "runif") {
+        p <- p +
+          scale_x_continuous("Sample mean", expand = c(0,0), limits = c(0,1))
+      } else {
+        p <- p +
+          scale_x_continuous("Sample mean", expand = c(0,0), limits = c(0,60))
+      }
+    }
+
+      
+    # Density/histogram radiobutton:        
+    if(input$showdensity == 1) { # choose density plot
+    ################# good
+      p <- p +
+        geom_density() +
+        scale_y_continuous(name = "Density", expand = c(0,0))
+
+      if(input$shownorm) { # Display norm on density
+        p <- p +
+          stat_function(fun = dnorm,
+                    colour = "red",
+                    args = list(mean = mean(df.raw$value), sd = sd(df.raw$value)))
+      }
+      ################# good
+      
+    #   
+    } else if (input$showdensity == 2) { # Show histogram
+      p <- p +
+      scale_y_continuous(name = "Absolute frequency", expand = c(0,0))
+
+        if (input$dist == "rnorm") {
+          p <- p + geom_histogram(fill = "#C42126", binwidth = bin_norm)
+        } else if (input$dist == "rexp") {
+          p <- p + geom_histogram(fill = "#C42126", binwidth = bin_exp)
+        } else if (input$dist == "rlnorm") {
+          p <- p + geom_histogram(fill = "#C42126", binwidth = bin_lnorm)
+        } else if (input$dist == "runif") {
+          p <- p + geom_histogram(fill = "#C42126", binwidth = bin_unif)
+        } else {
+          p <- p + geom_histogram(fill = "#C42126")
+        }
+
+    }
+    
+        
+    
+    p +
+      theme(panel.background = element_blank(),
+            panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            axis.ticks.x = element_line(colour = "black"),
+            axis.ticks.y = element_line(colour = "black"),
+            axis.line = element_line(colour = "black"),
+            #        axis.line.y = element_line(colour = "blue", size = 2),
+            axis.text.x = element_text(colour = "black"),
+            axis.text.y = element_text(colour = "black")
+      )
+    
+  })
+  # end renderPlot for plot_samples
+  #############################################################
 
 } # End server
